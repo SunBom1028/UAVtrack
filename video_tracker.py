@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QMainWindow, QFileDialog, QMessageBox, QTableWidgetItem
+from PyQt5.QtWidgets import QMainWindow, QFileDialog, QMessageBox, QTableWidgetItem, QInputDialog, QLineEdit
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtCore import QTimer
 from PyQt5 import QtWidgets
@@ -67,6 +67,11 @@ class VideoTracker(QMainWindow):
 
         # 连接历史记录表格的点击事件
         self.ui.tableWidget_history.itemDoubleClicked.connect(self.show_tracking_detail)
+        
+        # 连接历史记录页面的新控件
+        self.ui.comboBox.currentIndexChanged.connect(self.sort_history_records)
+        self.ui.searchBox.textChanged.connect(self.filter_history_records)
+        self.ui.deleteButton.clicked.connect(self.delete_tracking_record)
 
     def start_new_tracking(self):
         self.is_tracking=True
@@ -347,6 +352,82 @@ class VideoTracker(QMainWindow):
             self.ui.tableWidget_history.setItem(row_count, 0, QTableWidgetItem(table_name))
             self.ui.tableWidget_history.setItem(row_count, 1, QTableWidgetItem(str(created_at)))
             row_count += 1
+            
+        # 应用当前的排序和过滤设置
+        self.sort_history_records()
+        self.filter_history_records()
+        
+    def sort_history_records(self):
+        """根据comboBox的选择对历史记录进行排序"""
+        # 获取当前排序方式
+        sort_order = self.ui.comboBox.currentIndex()  # 0为正序，1为倒序
+        
+        # 获取表格中的所有行
+        rows = []
+        for row in range(self.ui.tableWidget_history.rowCount()):
+            table_name = self.ui.tableWidget_history.item(row, 0).text()
+            created_at = self.ui.tableWidget_history.item(row, 1).text()
+            rows.append((table_name, created_at))
+        
+        # 根据创建时间排序
+        rows.sort(key=lambda x: x[1], reverse=(sort_order == 1))
+        
+        # 重新填充表格
+        self.ui.tableWidget_history.setRowCount(0)
+        for row, (table_name, created_at) in enumerate(rows):
+            self.ui.tableWidget_history.insertRow(row)
+            self.ui.tableWidget_history.setItem(row, 0, QTableWidgetItem(table_name))
+            self.ui.tableWidget_history.setItem(row, 1, QTableWidgetItem(created_at))
+            
+    def filter_history_records(self):
+        """根据searchBox的内容过滤历史记录"""
+        search_text = self.ui.searchBox.text().lower()
+        
+        # 遍历所有行，隐藏不匹配的行
+        for row in range(self.ui.tableWidget_history.rowCount()):
+            table_name = self.ui.tableWidget_history.item(row, 0).text().lower()
+            created_at = self.ui.tableWidget_history.item(row, 1).text().lower()
+            
+            # 如果搜索文本为空或表格名称/创建时间包含搜索文本，则显示该行
+            if not search_text or search_text in table_name or search_text in created_at:
+                self.ui.tableWidget_history.setRowHidden(row, False)
+            else:
+                self.ui.tableWidget_history.setRowHidden(row, True)
+                
+    def delete_tracking_record(self):
+        """删除选中的追踪记录"""
+        # 获取选中的行
+        selected_rows = self.ui.tableWidget_history.selectedItems()
+        if not selected_rows:
+            QMessageBox.warning(self, "警告", "请先选择要删除的记录")
+            return
+            
+        # 获取选中的行号（确保不重复）
+        rows_to_delete = set()
+        for item in selected_rows:
+            rows_to_delete.add(item.row())
+            
+        # 确认删除
+        reply = QMessageBox.question(self, "确认删除", 
+                                    f"确定要删除选中的 {len(rows_to_delete)} 条记录吗？",
+                                    QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        
+        if reply == QMessageBox.Yes:
+            # 从后向前删除，避免索引变化
+            for row in sorted(rows_to_delete, reverse=True):
+                # 获取表名
+                table_name = self.ui.tableWidget_history.item(row, 0).text()
+                
+                # 从数据库中删除记录
+                self.db.execute("DELETE FROM tracking_tables WHERE table_name = %s", (table_name,))
+                
+                # 删除对应的追踪表
+                self.db.execute(f"DROP TABLE IF EXISTS {table_name}")
+                
+                # 从表格中删除行
+                self.ui.tableWidget_history.removeRow(row)
+                
+            QMessageBox.information(self, "成功", "记录已成功删除")
 
     def select_roi(self, frame):
         # 用OpenCV选择ROI（感兴趣区域），返回选择的矩形
@@ -399,8 +480,17 @@ class TrackingDetailWindow(QtWidgets.QWidget):
         self.ui = Ui_Form()  # 使用list.py中的UI
         self.ui.setupUi(self)
         self.setWindowTitle("追踪记录详情")
+        self.db = None
+        self.table_name = None
+        
+        # 连接重命名按钮的点击事件
+        self.ui.renameButton.clicked.connect(self.rename_table)
     
     def load_data(self, db, table_name):
+        # 保存数据库连接和表名
+        self.db = db
+        self.table_name = table_name
+        
         # 设置表名作为标题
         self.ui.label_listname.setText(f"追踪记录: {table_name}")
         
@@ -419,3 +509,45 @@ class TrackingDetailWindow(QtWidgets.QWidget):
             self.ui.tableWidget_list.setItem(row, 1, QTableWidgetItem(str(record['y'])))
             self.ui.tableWidget_list.setItem(row, 2, QTableWidgetItem(str(record['w'])))
             self.ui.tableWidget_list.setItem(row, 3, QTableWidgetItem(str(record['h'])))
+            
+    def rename_table(self):
+        """重命名当前追踪表"""
+        if not self.db or not self.table_name:
+            QMessageBox.warning(self, "错误", "无法重命名：未加载表数据")
+            return
+            
+        # 弹出输入对话框获取新表名
+        new_name, ok = QInputDialog.getText(
+            self, 
+            "重命名追踪表", 
+            "请输入新表名:", 
+            QLineEdit.Normal, 
+            self.table_name
+        )
+        
+        if ok and new_name and new_name != self.table_name:
+            try:
+                # 检查新表名是否已存在
+                existing_tables = self.db.fetchall("SELECT table_name FROM tracking_tables")
+                for table in existing_tables:
+                    if table['table_name'] == new_name:
+                        QMessageBox.warning(self, "错误", f"表名 '{new_name}' 已存在，请使用其他名称")
+                        return
+                
+                # 重命名表
+                self.db.execute(f"RENAME TABLE {self.table_name} TO {new_name}")
+                
+                # 更新tracking_tables表中的记录
+                self.db.execute(
+                    "UPDATE tracking_tables SET table_name = %s WHERE table_name = %s",
+                    (new_name, self.table_name)
+                )
+                
+                # 更新UI显示
+                self.table_name = new_name
+                self.ui.label_listname.setText(f"追踪记录: {new_name}")
+                
+                QMessageBox.information(self, "成功", f"表已成功重命名为 '{new_name}'")
+                
+            except Exception as e:
+                QMessageBox.critical(self, "错误", f"重命名表时出错: {str(e)}")

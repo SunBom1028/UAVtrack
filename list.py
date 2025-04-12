@@ -14,7 +14,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_Form(object):
     def setupUi(self, Form):
         Form.setObjectName("Form")
-        Form.resize(599, 477)
+        Form.resize(599, 476)
         Form.setStyleSheet("\n"
 "background-color: rgb(255, 255, 255);\n"
 "Ubuntu Style Sheet for QT Applications\n"
@@ -523,7 +523,7 @@ class Ui_Form(object):
         self.label_listname.setFont(font)
         self.label_listname.setObjectName("label_listname")
         self.tableWidget_list = QtWidgets.QTableWidget(Form)
-        self.tableWidget_list.setGeometry(QtCore.QRect(10, 40, 581, 431))
+        self.tableWidget_list.setGeometry(QtCore.QRect(10, 50, 581, 421))
         font = QtGui.QFont()
         font.setFamily("Consolas")
         font.setPointSize(10)
@@ -555,6 +555,64 @@ class Ui_Form(object):
         self.tableWidget_list.setHorizontalHeaderItem(3, item)
         self.tableWidget_list.horizontalHeader().setDefaultSectionSize(140)
         self.tableWidget_list.verticalHeader().setDefaultSectionSize(40)
+        self.renameButton = QtWidgets.QPushButton(Form)
+        self.renameButton.setGeometry(QtCore.QRect(480, 10, 91, 31))
+        font = QtGui.QFont()
+        font.setFamily("幼圆")
+        font.setPointSize(10)
+        font.setBold(False)
+        font.setWeight(50)
+        self.renameButton.setFont(font)
+        self.renameButton.setStyleSheet("QPushButton{\n"
+"    color:rgb(17,17,17);\n"
+"    border-width: 1px;\n"
+"    border-radius: 6px;\n"
+"    border-bottom-color: rgb(150,150,150);\n"
+"    border-right-color: rgb(165,165,165);\n"
+"    border-left-color: rgb(165,165,165);\n"
+"    border-top-color: rgb(180,180,180);\n"
+"    border-style: solid;\n"
+"    padding: 4px;\n"
+"    background-color: qlineargradient(spread:pad, x1:0.5, y1:1, x2:0.5, y2:0, stop:0 rgba(220, 220, 220, 255), stop:1 rgba(255, 255, 255, 255));\n"
+"}\n"
+"QPushButton:hover{\n"
+"    color:rgb(17,17,17);\n"
+"    border-width: 1px;\n"
+"    border-radius:6px;\n"
+"    border-top-color: rgb(255,150,60);\n"
+"    border-right-color: qlineargradient(spread:pad, x1:0, y1:1, x2:1, y2:0, stop:0 rgba(200, 70, 20, 255), stop:1 rgba(255,150,60, 255));\n"
+"    border-left-color:  qlineargradient(spread:pad, x1:1, y1:0, x2:0, y2:0, stop:0 rgba(200, 70, 20, 255), stop:1 rgba(255,150,60, 255));\n"
+"    border-bottom-color: rgb(200,70,20);\n"
+"    border-style: solid;\n"
+"    padding: 2px;\n"
+"    background-color: qlineargradient(spread:pad, x1:0.5, y1:1, x2:0.5, y2:0, stop:0 rgba(220, 220, 220, 255), stop:1 rgba(255, 255, 255, 255));\n"
+"}\n"
+"QPushButton:default{\n"
+"    color:rgb(17,17,17);\n"
+"    border-width: 1px;\n"
+"    border-radius:6px;\n"
+"    border-top-color: rgb(255,150,60);\n"
+"    border-right-color: qlineargradient(spread:pad, x1:0, y1:1, x2:1, y2:0, stop:0 rgba(200, 70, 20, 255), stop:1 rgba(255,150,60, 255));\n"
+"    border-left-color:  qlineargradient(spread:pad, x1:1, y1:0, x2:0, y2:0, stop:0 rgba(200, 70, 20, 255), stop:1 rgba(255,150,60, 255));\n"
+"    border-bottom-color: rgb(200,70,20);\n"
+"    border-style: solid;\n"
+"    padding: 2px;\n"
+"    background-color: qlineargradient(spread:pad, x1:0.5, y1:1, x2:0.5, y2:0, stop:0 rgba(220, 220, 220, 255), stop:1 rgba(255, 255, 255, 255));\n"
+"}\n"
+"QPushButton:pressed{\n"
+"    color:rgb(17,17,17);\n"
+"    border-width: 1px;\n"
+"    border-radius: 6px;\n"
+"    border-width: 1px;\n"
+"    border-top-color: rgba(255,150,60,200);\n"
+"    border-right-color: qlineargradient(spread:pad, x1:0, y1:1, x2:1, y2:0, stop:0 rgba(200, 70, 20, 255), stop:1 rgba(255,150,60, 200));\n"
+"    border-left-color:  qlineargradient(spread:pad, x1:1, y1:0, x2:0, y2:0, stop:0 rgba(200, 70, 20, 255), stop:1 rgba(255,150,60, 200));\n"
+"    border-bottom-color: rgba(200,70,20,200);\n"
+"    border-style: solid;\n"
+"    padding: 2px;\n"
+"    background-color: qlineargradient(spread:pad, x1:0.5, y1:0, x2:0.5, y2:1, stop:0 rgba(220, 220, 220, 255), stop:1 rgba(255, 255, 255, 255));\n"
+"}")
+        self.renameButton.setObjectName("renameButton")
 
         self.retranslateUi(Form)
         QtCore.QMetaObject.connectSlotsByName(Form)
@@ -571,3 +629,4 @@ class Ui_Form(object):
         item.setText(_translate("Form", "w"))
         item = self.tableWidget_list.horizontalHeaderItem(3)
         item.setText(_translate("Form", "h"))
+        self.renameButton.setText(_translate("Form", "修改表名"))
