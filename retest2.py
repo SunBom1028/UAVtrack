@@ -11,6 +11,8 @@ from PyQt5.QtGui import QFont
 from PyQt5.QtGui import QImage, QPixmap
 import pymysql
 import time
+from denglu import Ui_myname
+from trackui import Ui_MainWindow
 
 class Database:
     def __init__(self, host, user, password, db):
@@ -49,27 +51,13 @@ class LoginWindow(QDialog):
         self.initUI()
 
     def initUI(self):
-        self.setWindowTitle("登录界面")
-        self.setGeometry(100, 100, 300, 200)
-
-        self.username_label = QLabel("用户名：", self)
-        self.username_label.move(20, 30)
-        self.username_input = QLineEdit(self)
-        self.username_input.move(100, 30)
-
-        self.password_label = QLabel("密码：", self)
-        self.password_label.move(20, 80)
-        self.password_input = QLineEdit(self)
-        self.password_input.setEchoMode(QLineEdit.Password)
-        self.password_input.move(100, 80)
-
-        self.login_btn = QPushButton("登录", self)
-        self.login_btn.move(100, 130)
-        self.login_btn.clicked.connect(self.check_login)
+        self.ui = Ui_myname()
+        self.ui.setupUi(self)
+        self.ui.pushButton_access.clicked.connect(self.check_login)
 
     def check_login(self):
-        username = self.username_input.text()
-        password = self.password_input.text()
+        username = self.ui.lineEdit_account.text()
+        password = self.ui.lineEdit_password.text()
 
         user = self.db.fetchone("SELECT * FROM users WHERE username = %s", (username,))
         if user:
@@ -83,52 +71,18 @@ class LoginWindow(QDialog):
         else:
             QMessageBox.warning(self, "错误", "用户不存在！")
 
-class HistoryWindow(QDialog):
-    def __init__(self, db, user_id):
-        super().__init__()
-        self.db = db
-        self.user_id = user_id
-        self.initUI()
-
-    def initUI(self):
-        self.setWindowTitle("历史追踪记录")
-        self.setGeometry(200, 200, 300, 600)
-
-        # 表格组件
-        self.table_widget = QTableWidget(self)
-        self.table_widget.setGeometry(20, 20, 260, 550)
-        self.table_widget.setColumnCount(2)  # 列数：表名、时间、x, y, w, h
-        self.table_widget.setHorizontalHeaderLabels(["表名", "创建时间"])
-
-        self.load_history()
-
-    def load_history(self):
-        # 查询用户的所有追踪表
-        tracking_tables = self.db.fetchall("""
-            SELECT table_name, created_at FROM tracking_tables WHERE user_id = %s
-        """, (self.user_id,))
-
-        # 遍历每个追踪表，加载记录
-        row_count = 0
-        for table in tracking_tables:
-            table_name = table["table_name"]
-            created_at = table["created_at"]
-            self.table_widget.insertRow(row_count)
-            self.table_widget.setItem(row_count, 0, QTableWidgetItem(table_name))
-            self.table_widget.setItem(row_count, 1, QTableWidgetItem(str(created_at)))
-            row_count += 1
-
-
-# 视频追踪主窗口
 class VideoTracker(QMainWindow):
-    def __init__(self,db,user_id,username):
+    def __init__(self, db, user_id, username):
         super().__init__()
         self.db = db
         self.user_id = user_id
         self.username = username
         self.tracking_table_name = None
         self.face_images_paths = {'left': None, 'front': None, 'right': None}
+        self.is_tracking = False  # 添加标志
 
+        self.ui = Ui_MainWindow()
+        self.ui.setupUi(self)
         self.initUI()
         self.cap = None
         self.tracker = None
@@ -136,9 +90,38 @@ class VideoTracker(QMainWindow):
         self.model_type = None
         self.face_image_path = None
 
+        # 连接停止追踪按钮的信号
+        self.ui.pushButton_object_stop.clicked.connect(self.stop_tracking)
+        self.ui.pushButton_human_stop.clicked.connect(self.stop_tracking)
+        self.ui.pushButton_multiface_stop.clicked.connect(self.stop_tracking)
+
+        # 连接上传人脸图片按钮的信号
+        self.ui.pushButton_faceimage_upload.clicked.connect(self.load_face_image)  # 单人脸上传
+        self.ui.pushButton_multifaceimage_upload.clicked.connect(self.load_face_image)  # 多人脸上传
+
+        # 连接查看历史记录按钮的信号
+        self.ui.pushButton_history.clicked.connect(self.load_history)
+
+    def stop_tracking(self):
+        """停止追踪的方法"""
+        self.is_tracking = False  # 设置标志为 False
+        if self.cap is not None:
+            self.cap.release()  # 释放视频捕获
+        cv2.destroyAllWindows()  # 关闭所有 OpenCV 窗口
+
     def start_new_tracking(self):
-        self.table_widget.clearContents()
-        self.table_widget.setRowCount(0)
+        self.is_tracking=True
+        # 根据当前选中的页面选择相应的表格
+        if self.ui.stackedWidget.currentIndex() == 0:  # 物体追踪
+            self.ui.tableWidget_object.clearContents()
+            self.ui.tableWidget_object.setRowCount(0)
+        elif self.ui.stackedWidget.currentIndex() == 1:  # 人类追踪
+            self.ui.tableWidget_human.clearContents()
+            self.ui.tableWidget_human.setRowCount(0)
+        elif self.ui.stackedWidget.currentIndex() == 2:  # 多角度人脸追踪
+            self.ui.tableWidget_multiface.clearContents()
+            self.ui.tableWidget_multiface.setRowCount(0)
+
         # 生成唯一表名
         timestamp = int(time.time())  # 当前时间戳
         self.tracking_table_name = f"{self.username}_tracking_{timestamp}"
@@ -161,121 +144,39 @@ class VideoTracker(QMainWindow):
         """, (self.user_id, self.tracking_table_name))
 
     def initUI(self):
-        font = QFont()
-        font.setPointSize(12)
+        # 这里可以移除原有的 UI 初始化代码
+        # 直接使用 trackui.py 中的 UI 组件
+        self.ui.pushButton_object.clicked.connect(lambda: self.ui.stackedWidget.setCurrentIndex(0))
+        self.ui.pushButton_human.clicked.connect(lambda: self.ui.stackedWidget.setCurrentIndex(1))
+        self.ui.pushButton_multiface.clicked.connect(lambda: self.ui.stackedWidget.setCurrentIndex(2))
+        self.ui.pushButton_history.clicked.connect(lambda: self.ui.stackedWidget.setCurrentIndex(3))
 
-        # 选择目标类型下拉菜单
-        self.comboBox = QComboBox(self)
-        self.comboBox.addItem("物体")
-        self.comboBox.addItem("人类")
-        self.comboBox.addItem("多角度人脸")
-        self.comboBox.move(50, 150)
-        self.comboBox.currentIndexChanged.connect(self.on_target_type_changed)
-        self.comboBox.setFont(font)
-
-        self.btn_upload_face = QPushButton('上传面部图片', self)
-        self.btn_upload_face.clicked.connect(self.load_face_image)
-        self.btn_upload_face.move(50, 200)
-        self.btn_upload_face.setFont(font)
-        self.btn_upload_face.setVisible(False)  # 初始时隐藏按钮
-
-        # 显示目标人脸图片
-        self.face_image_label = QLabel(self)
-        self.face_image_label.setGeometry(50, 350, 200, 200)
-        self.face_image_label.setVisible(False)  # 初始时隐藏
-
-        self.history_btn = QPushButton("查看历史记录", self)
-        self.history_btn.move(50, 250)
-        self.history_btn.clicked.connect(self.show_history)
-
-        # 视频显示标签
-        #self.label = QLabel(self)
-        #self.label.setGeometry(50, 150, 640, 480)
-        label1 = QLabel("追踪选项", self)
-        label1.setGeometry(50, 50, 100, 50)
-        label1.setStyleSheet("font-size: 20px; font-weight: bold;")
-
-        label2 = QLabel("追踪记录", self)
-        label2.setGeometry(300, 50, 100, 50)
-        label2.setStyleSheet("font-size: 20px; font-weight: bold;")
-
-        # 位置记录表格
-        self.table_widget = QTableWidget(self)
-        self.table_widget.setRowCount(0)
-        self.table_widget.setColumnCount(4)
-        self.table_widget.setHorizontalHeaderLabels(["X", "Y", "W", "H"])
-        self.table_widget.setGeometry(300, 100, 400, 480)
-
-        self.setGeometry(100, 100, 750, 630)
-        self.setWindowTitle("追踪界面")
-
-        v_line = QFrame(self)
-        v_line.setGeometry(225, 0, 2, 1000)  # 设置位置(x, y)和宽度、高度
-        v_line.setFrameShape(QFrame.VLine)  # 设置为垂直线
-        v_line.setFrameShadow(QFrame.Sunken)  # 设置样式为凹陷
-
-        self.btn_webcam = QPushButton('使用摄像头追踪', self)
-        self.btn_webcam.clicked.connect(self.use_webcam)
-        self.btn_webcam.move(50, 300)
-        self.btn_webcam.setFont(font)
-
-        # 选择视频按钮
-        self.btn_open = QPushButton('上传视频追踪', self)
-        self.btn_open.clicked.connect(self.load_video)
-        self.btn_open.move(50, 350)
-        self.btn_open.setFont(font)
-
-    def on_target_type_changed(self):
-        # 当目标类型选择发生变化时，如果选择的是Human，则显示上传人脸图片按钮
-        if self.comboBox.currentText() == "人类":
-            self.btn_upload_face.setVisible(True)  # 显示按钮
-        elif self.comboBox.currentText() == "多角度人脸":
-            self.btn_upload_face.setVisible(True)  # Show button for uploading face images
-        else:
-            self.btn_upload_face.setVisible(False)  # 隐藏按钮
+        # 连接上传视频和摄像头按钮
+        self.ui.pushButton_object_upload.clicked.connect(self.load_video)  # 物体追踪上传视频
+        self.ui.pushButton_human_upload.clicked.connect(self.load_video)  # 人类追踪上传视频
+        self.ui.pushButton_multiface_upload.clicked.connect(self.load_video)  # 多角度人脸上传视频
+        self.ui.pushButton_object_camera.clicked.connect(self.use_webcam)  # 物体追踪摄像头
+        self.ui.pushButton_human_camera.clicked.connect(self.use_webcam)  # 人类追踪摄像头
+        self.ui.pushButton_multiface_camera.clicked.connect(self.use_webcam)  # 多角度人脸摄像头
 
     def load_face_image(self):
-        if self.comboBox.currentText() == "多角度人脸":
-            for angle in ['left', 'front', 'right']:
-                path, _ = QFileDialog.getOpenFileName(self, f"Select {angle} Face Image", "",
-                                                      "Image Files (*.jpg *.png *.jpeg)")
-                if path:
-                    self.face_images_paths[angle] = path
-            QMessageBox.information(self, "信息", "多角度人脸图片加载成功！")
-        else:
             self.face_image_path, _ = QFileDialog.getOpenFileName(self, "Select Face Image", "",
                                                          "Image Files (*.jpg *.png *.jpeg)")
             if self.face_image_path:
                 self.face_image = cv2.imread(self.face_image_path, cv2.IMREAD_COLOR)
-                if self.face_image is not None:
-                    # 将图片转换为QPixmap显示在QLabel上
-                    height, width, channels = self.face_image.shape
-                    bytes_per_line = channels * width
-                    qimg = QImage(self.face_image.data, width, height, bytes_per_line, QImage.Format_BGR888)  
-                    pixmap = QPixmap.fromImage(qimg)
-
-                    # 设置图片为QLabel的内容
-                    self.face_image_label.setPixmap(pixmap.scaled(100, 130))
-                    self.face_image_label.setVisible(True)  # 显示QLabel
-                    QMessageBox.information(self, "信息", "目标人脸图片加载成功！")
-                else:
-                    QMessageBox.warning(self, "错误", "目标人脸图片加载失败")
+                
 
 
     def load_video(self):
         # 打开文件对话框选择视频
         video_path, _ = QFileDialog.getOpenFileName(self, "Select Video", "", "Video Files (*.mp4 *.avi)")
         if video_path:
-            if self.comboBox.currentText() == "人类" and self.face_image_path is None:
+            if self.ui.stackedWidget.currentIndex() == 1 and self.face_image_path is None:  # 人类追踪
                 QMessageBox.warning(self, "错误", "请先上传目标人脸图片")
-            elif self.comboBox.currentText() == "多角度人脸":
+            elif self.ui.stackedWidget.currentIndex() == 2:  # 多角度人脸
                 self.multi_angle_facenet_track(video_path)
-            else:
-                if self.comboBox.currentText() == "物体":
-                    self.siamfc_track(video_path)
-                elif self.comboBox.currentText() == "人类":
-                    self.facenet_track(video_path)
-
+            else:  # 物体追踪
+                self.siamfc_track(video_path)
     
 
     def select_roi(self, frame):
@@ -284,22 +185,35 @@ class VideoTracker(QMainWindow):
         cv2.destroyWindow("Select ROI")
         return bbox
 
+    def update_label_with_frame(self, frame, is_human_tracking=False):
+        """将 OpenCV 图像更新到 QLabel 中"""
+        # 将 BGR 图像转换为 RGB
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        height, width, channels = frame_rgb.shape
+        bytes_per_line = channels * width
+        qimg = QImage(frame_rgb.data, width, height, bytes_per_line, QImage.Format_RGB888)
+        
+        # 根据是否是人类追踪选择 QLabel
+        if is_human_tracking:
+            self.ui.label_video_human.setPixmap(QPixmap.fromImage(qimg))
+        else:
+            self.ui.label_video_object.setPixmap(QPixmap.fromImage(qimg))
+
     def siamfc_track(self, video_path):
         self.start_new_tracking()
-
         net_path = 'pretrained/siamfc_alexnet_e50.pth'  # 预训练模型路径
 
         # 初始化视频读取
-        cap = cv2.VideoCapture(video_path)
-        if not cap.isOpened():
+        self.cap = cv2.VideoCapture(video_path)
+        if not self.cap.isOpened():
             print("错误：无法打开视频")
             return
 
         # 读取第一帧并选择ROI
-        ret, first_frame = cap.read()
+        ret, first_frame = self.cap.read()
         if not ret:
             print("错误：无法读取视频帧")
-            cap.release()
+            self.cap.release()
             return
 
         # 选择ROI
@@ -307,43 +221,35 @@ class VideoTracker(QMainWindow):
         init_bbox = [x, y, w, h]
 
         QMessageBox.information(self, "信息", "目标已确定，开始追踪，按q退出")
+        self.is_tracking = True  # 设置标志为 True
 
         # 初始化SiamFC追踪器
         self.tracker = TrackerSiamFC(net_path=net_path)
         self.tracker.init(first_frame, init_bbox)
 
-        # 打开文件写入追踪数据
-        with open("tracking_data.txt", "w") as file:
-            # 逐帧进行追踪
-            while cap.isOpened():
-                ret, frame = cap.read()
-                if not ret:
-                    break
+        while self.is_tracking and self.cap.isOpened():
+            ret, frame = self.cap.read()
+            if not ret:
+                break
 
-                # 更新跟踪器
-                bbox = self.tracker.update(frame)
-                x, y, w, h = map(int, bbox)
+            # 更新跟踪器
+            bbox = self.tracker.update(frame)
+            x, y, w, h = map(int, bbox)
 
-                self.db.execute(f"""
-                                INSERT INTO {self.tracking_table_name} (x, y, w, h)
-                                VALUES (%s, %s, %s, %s)
-                            """, (x, y, w, h))
+            # 绘制追踪框
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
 
-                # 绘制追踪框
-                cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
-                cv2.imshow('Tracking object', frame)
+            # 更新 QLabel 显示视频帧
+            self.update_label_with_frame(frame)
 
-                # 记录追踪框位置到文件中
-                file.write(f"{x},{y},{w},{h}\n")
+            # 更新表格记录边界框
+            self.update_table(x, y, w, h)
 
-                # 在表格中显示追踪数据
-                self.update_table(x, y, w, h)
+            #
+            if self.is_tracking==False:
+                break
 
-                # 按下Q退出
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    break
-
-        cap.release()
+        self.cap.release()
         cv2.destroyAllWindows()
 
     def facenet_track(self, video_path):
@@ -423,28 +329,61 @@ class VideoTracker(QMainWindow):
         cv2.destroyAllWindows()
 
     def update_table(self, x, y, w, h):
-        # 新增一行并插入追踪数据
-        row_position = self.table_widget.rowCount()
-        self.table_widget.insertRow(row_position)
-        self.table_widget.setItem(row_position, 0, QTableWidgetItem(str(x)))
-        self.table_widget.setItem(row_position, 1, QTableWidgetItem(str(y)))
-        self.table_widget.setItem(row_position, 2, QTableWidgetItem(str(w)))
-        self.table_widget.setItem(row_position, 3, QTableWidgetItem(str(h)))
+        # 根据当前选中的页面选择相应的表格
+        row_position = 0
+        if self.ui.stackedWidget.currentIndex() == 0:  # 物体追踪
+            row_position = self.ui.tableWidget_object.rowCount()
+            self.ui.tableWidget_object.insertRow(row_position)
+            self.ui.tableWidget_object.setItem(row_position, 0, QTableWidgetItem(str(x)))
+            self.ui.tableWidget_object.setItem(row_position, 1, QTableWidgetItem(str(y)))
+            self.ui.tableWidget_object.setItem(row_position, 2, QTableWidgetItem(str(w)))
+            self.ui.tableWidget_object.setItem(row_position, 3, QTableWidgetItem(str(h)))
+        elif self.ui.stackedWidget.currentIndex() == 1:  # 人类追踪
+            row_position = self.ui.tableWidget_human.rowCount()
+            self.ui.tableWidget_human.insertRow(row_position)
+            self.ui.tableWidget_human.setItem(row_position, 0, QTableWidgetItem(str(x)))
+            self.ui.tableWidget_human.setItem(row_position, 1, QTableWidgetItem(str(y)))
+            self.ui.tableWidget_human.setItem(row_position, 2, QTableWidgetItem(str(w)))
+            self.ui.tableWidget_human.setItem(row_position, 3, QTableWidgetItem(str(h)))
+        elif self.ui.stackedWidget.currentIndex() == 2:  # 多角度人脸追踪
+            row_position = self.ui.tableWidget_multiface.rowCount()
+            self.ui.tableWidget_multiface.insertRow(row_position)
+            self.ui.tableWidget_multiface.setItem(row_position, 0, QTableWidgetItem(str(x)))
+            self.ui.tableWidget_multiface.setItem(row_position, 1, QTableWidgetItem(str(y)))
+            self.ui.tableWidget_multiface.setItem(row_position, 2, QTableWidgetItem(str(w)))
+            self.ui.tableWidget_multiface.setItem(row_position, 3, QTableWidgetItem(str(h)))
 
-    def show_history(self):
-        history_window = HistoryWindow(self.db, self.user_id)
-        history_window.exec_()
+    def load_history(self):
+        """加载历史记录并显示在 tableWidget_history 中"""
+        # 清空历史记录表
+        self.ui.tableWidget_history.clearContents()
+        self.ui.tableWidget_history.setRowCount(0)
 
-    def use_webcam(self):
-        if self.comboBox.currentText() == "人类" and self.face_image_path is None:
-            QMessageBox.warning(self, "错误", "请先上传目标人脸图片")
-        else:
-            if self.comboBox.currentText() == "物体":
-                self.siamfc_track_webcam()
-            elif self.comboBox.currentText() == "人类":
-                self.facenet_track_webcam()
-            elif self.comboBox.currentText() == "多角度人脸":
-                self.multi_angle_facenet_track_webcam()
+        # 查询用户的所有追踪表
+        tracking_tables = self.db.fetchall("""
+            SELECT table_name, created_at FROM tracking_tables WHERE user_id = %s
+        """, (self.user_id,))
+
+        # 遍历每个追踪表，加载记录
+        row_count = 0
+        for table in tracking_tables:
+            table_name = table["table_name"]
+            created_at = table["created_at"]
+            self.ui.tableWidget_history.insertRow(row_count)
+            self.ui.tableWidget_history.setItem(row_count, 0, QTableWidgetItem(table_name))
+            self.ui.tableWidget_history.setItem(row_count, 1, QTableWidgetItem(str(created_at)))
+            row_count += 1
+
+    def use_webcam(self): 
+        # if self.comboBox.currentText() == "人类" and self.face_image_path is None:
+       
+        # 直接根据当前选中的页面调用相应的追踪方法
+        if self.ui.stackedWidget.currentIndex() == 0:  # 物体追踪
+            self.siamfc_track_webcam()
+        elif self.ui.stackedWidget.currentIndex() == 1:  # 人类追踪
+            self.facenet_track_webcam()
+        elif self.ui.stackedWidget.currentIndex() == 2:  # 多角度人脸追踪
+            self.multi_angle_facenet_track_webcam()
 
     def siamfc_track_webcam(self):
         self.start_new_tracking()
@@ -465,6 +404,7 @@ class VideoTracker(QMainWindow):
             return
 
         # Select ROI
+        time.sleep(1)
         x, y, w, h = self.select_roi(first_frame)
         init_bbox = [x, y, w, h]
 
@@ -474,7 +414,7 @@ class VideoTracker(QMainWindow):
         self.tracker = TrackerSiamFC(net_path=net_path)
         self.tracker.init(first_frame, init_bbox)
 
-        while cap.isOpened():
+        while cap.isOpened() and self.is_tracking==True:
             ret, frame = cap.read()
             if not ret:
                 break
@@ -490,12 +430,14 @@ class VideoTracker(QMainWindow):
 
             # Draw tracking box
             cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
-            cv2.imshow('Tracking object', frame)
 
-            # Update table with tracking data
+            # 更新 QLabel 显示视频帧
+            self.update_label_with_frame(frame)
+
+            # 更新表格记录边界框
             self.update_table(x, y, w, h)
 
-            # Press 'q' to exit
+            # 按下Q退出
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
@@ -534,15 +476,14 @@ class VideoTracker(QMainWindow):
 
             # Convert frame to PIL image and detect faces
             frame_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-            aligned_faces, probs = mtcnn(frame_pil, return_prob=True)
+            aligned_faces, _ = mtcnn(frame_pil, return_prob=True)
 
             if aligned_faces is not None:
                 aligned_faces = aligned_faces.to(device)
-
-                embeddings = resnet(aligned_faces).detach().cpu()
+                detected_embeddings = resnet(aligned_faces).detach().cpu()
 
                 # Calculate distances between target embedding and detected faces
-                distances = [(target_embedding - emb).norm().item() for emb in embeddings]
+                distances = [(target_embedding - emb).norm().item() for emb in detected_embeddings]
                 min_dist_index = np.argmin(distances)
                 min_dist_box = mtcnn.detect(frame_pil)[0][min_dist_index]
 
@@ -561,8 +502,10 @@ class VideoTracker(QMainWindow):
                 draw.rectangle(min_dist_box.tolist(), outline=(255, 0, 0), width=6)
                 frame = cv2.cvtColor(np.array(frame_pil), cv2.COLOR_RGB2BGR)
 
-            # Display current frame
-            cv2.imshow('Searching face and tracking', frame)
+                # Update QLabel with the current frame, indicating it's human tracking
+                self.update_label_with_frame(frame, is_human_tracking=True)
+
+            # Check for exit key
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
@@ -701,7 +644,7 @@ class VideoTracker(QMainWindow):
 if __name__ == '__main__':
     DB_HOST = 'localhost'
     DB_USER = 'root'
-    DB_PASSWORD = '1234'  # 替换为你的数据库密码
+    DB_PASSWORD = '1234'  
     DB_NAME = 'tracker_db'
     db = Database(DB_HOST, DB_USER, DB_PASSWORD, DB_NAME)
 
@@ -711,7 +654,7 @@ if __name__ == '__main__':
     login_window = LoginWindow(db)
     if login_window.exec_() == QDialog.Accepted:
         user_id = login_window.user_id
-        username = login_window.username_input.text()
+        username = login_window.ui.lineEdit_account.text()
         
         main_window = VideoTracker(db, user_id, username)
         main_window.show()

@@ -11,6 +11,7 @@ from PyQt5.QtGui import QFont
 from PyQt5.QtGui import QImage, QPixmap
 import pymysql
 import time
+from denglu import Ui_myname
 
 class Database:
     def __init__(self, host, user, password, db):
@@ -49,27 +50,13 @@ class LoginWindow(QDialog):
         self.initUI()
 
     def initUI(self):
-        self.setWindowTitle("登录界面")
-        self.setGeometry(100, 100, 300, 200)
-
-        self.username_label = QLabel("用户名：", self)
-        self.username_label.move(20, 30)
-        self.username_input = QLineEdit(self)
-        self.username_input.move(100, 30)
-
-        self.password_label = QLabel("密码：", self)
-        self.password_label.move(20, 80)
-        self.password_input = QLineEdit(self)
-        self.password_input.setEchoMode(QLineEdit.Password)
-        self.password_input.move(100, 80)
-
-        self.login_btn = QPushButton("登录", self)
-        self.login_btn.move(100, 130)
-        self.login_btn.clicked.connect(self.check_login)
+        self.ui = Ui_myname()
+        self.ui.setupUi(self)
+        self.ui.pushButton_access.clicked.connect(self.check_login)
 
     def check_login(self):
-        username = self.username_input.text()
-        password = self.password_input.text()
+        username = self.ui.lineEdit_account.text()
+        password = self.ui.lineEdit_password.text()
 
         user = self.db.fetchone("SELECT * FROM users WHERE username = %s", (username,))
         if user:
@@ -251,7 +238,7 @@ class VideoTracker(QMainWindow):
                     # 将图片转换为QPixmap显示在QLabel上
                     height, width, channels = self.face_image.shape
                     bytes_per_line = channels * width
-                    qimg = QImage(self.face_image.data, width, height, bytes_per_line, QImage.Format_BGR888)  
+                    qimg = QImage(self.face_image.data, width, height, bytes_per_line, QImage.Format_BGR888)
                     pixmap = QPixmap.fromImage(qimg)
 
                     # 设置图片为QLabel的内容
@@ -711,7 +698,7 @@ if __name__ == '__main__':
     login_window = LoginWindow(db)
     if login_window.exec_() == QDialog.Accepted:
         user_id = login_window.user_id
-        username = login_window.username_input.text()
+        username = login_window.ui.lineEdit_account.text()
         
         main_window = VideoTracker(db, user_id, username)
         main_window.show()
