@@ -14,6 +14,7 @@ from siamfc import TrackerSiamFC
 
 from trackui import Ui_MainWindow
 from list import Ui_Form  # 导入list.py中的UI类
+from user_manager import UserManager  # 导入用户管理类
 
 class VideoTracker(QMainWindow):
     def __init__(self, db, user_id, username):
@@ -40,6 +41,14 @@ class VideoTracker(QMainWindow):
         self.bbox = None
         self.model_type = None
         self.face_image_path = None
+
+        # 检查用户权限并设置用户管理按钮的可见性
+        user = self.db.fetchone("SELECT permission FROM users WHERE user_id = %s", (self.user_id,))
+        if user and user['permission'] == 'admin':
+            self.ui.pushButton_usermanage.setVisible(True)
+            self.ui.pushButton_usermanage.clicked.connect(self.show_user_manager)
+        else:
+            self.ui.pushButton_usermanage.setVisible(False)
 
         # 翻页&堆叠窗口
         self.ui.pushButton_object.clicked.connect(lambda: self.ui.stackedWidget.setCurrentIndex(0))
@@ -473,6 +482,11 @@ class VideoTracker(QMainWindow):
         
         # 将窗口保存到列表中，防止被垃圾回收
         self.detail_windows.append(detail_window)
+
+    def show_user_manager(self):
+        """显示用户管理界面"""
+        user_manager = UserManager(self.db)
+        user_manager.exec_()
 
 class TrackingDetailWindow(QtWidgets.QWidget):
     def __init__(self, parent=None):

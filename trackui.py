@@ -14,7 +14,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(800, 600)
+        MainWindow.resize(796, 604)
         MainWindow.setStyleSheet("/*\n"
 "Ubuntu Style Sheet for QT Applications\n"
 "Author: Jaime A. Quiroga P.\n"
@@ -1335,13 +1335,20 @@ class Ui_MainWindow(object):
         self.label.setPixmap(QtGui.QPixmap("标题.png"))
         self.label.setScaledContents(True)
         self.label.setObjectName("label")
+        self.pushButton_usermanage = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButton_usermanage.setGeometry(QtCore.QRect(30, 70, 141, 51))
+        font = QtGui.QFont()
+        font.setFamily("幼圆")
+        font.setPointSize(12)
+        self.pushButton_usermanage.setFont(font)
+        self.pushButton_usermanage.setObjectName("pushButton_usermanage")
         MainWindow.setCentralWidget(self.centralwidget)
         self.statusbar = QtWidgets.QStatusBar(MainWindow)
         self.statusbar.setObjectName("statusbar")
         MainWindow.setStatusBar(self.statusbar)
 
         self.retranslateUi(MainWindow)
-        self.stackedWidget.setCurrentIndex(3)
+        self.stackedWidget.setCurrentIndex(0)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
     def retranslateUi(self, MainWindow):
@@ -1395,3 +1402,4 @@ class Ui_MainWindow(object):
         self.pushButton_human.setText(_translate("MainWindow", "追踪面部"))
         self.pushButton_multiface.setText(_translate("MainWindow", "测试：多角度面部"))
         self.pushButton_history.setText(_translate("MainWindow", "查看追踪记录"))
+        self.pushButton_usermanage.setText(_translate("MainWindow", "用户管理"))
