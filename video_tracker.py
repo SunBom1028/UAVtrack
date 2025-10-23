@@ -16,6 +16,8 @@ from trackui import Ui_MainWindow
 from list import Ui_Form  
 from user_manager import UserManager 
 
+import math
+
 class VideoTracker(QMainWindow):
     def __init__(self, db, user_id, username):
         super().__init__()
@@ -26,6 +28,11 @@ class VideoTracker(QMainWindow):
         self.detail_windows = []  # 保存详情窗口
 
         self.is_tracking = False # 是否正在追踪的flag
+
+        self.prev_position = None  # 上一帧目标位置
+        self.prev_time = None      # 上一帧时间戳
+        self.current_speed = 0     # 当前速度
+        self.show_speed = True     # 是否显示速度
 
         self.timer = QTimer()  # 计时器
         self.timer.timeout.connect(self.update_frame)  # 连接更新帧的槽函数
@@ -98,6 +105,16 @@ class VideoTracker(QMainWindow):
         self.ui.comboBox.currentIndexChanged.connect(self.sort_history_records)
         self.ui.searchBox.textChanged.connect(self.filter_history_records)
         self.ui.deleteButton.clicked.connect(self.delete_tracking_record)
+
+        # 速度显示开关按钮
+        self.ui.checkBox_show_speed = QtWidgets.QCheckBox("显示速度")
+        self.ui.checkBox_show_speed.setChecked(True)
+        self.ui.checkBox_show_speed.stateChanged.connect(self.toggle_speed_display)
+        self.ui.horizontalLayout.addWidget(self.ui.checkBox_show_speed)
+        
+    # 速度显示开关方法
+    def toggle_speed_display(self, state):
+        self.show_speed = state == 2  # QtCore.Qt.Checked = 2
 
     def start_new_tracking(self):
         self.is_tracking=True
@@ -225,6 +242,28 @@ class VideoTracker(QMainWindow):
         self.timer.start(30)
 
     def update_frame(self):
+        # 获取当前时间
+        current_time = time.time()
+        # 计算速度
+        if self.prev_position is not None and self.prev_time is not None:
+            # 计算位移（欧几里得距离）
+            dx = x + w/2 - self.prev_position[0]  # 当前中心点x - 上一帧中心点x
+            dy = y + h/2 - self.prev_position[1]  # 当前中心点y - 上一帧中心点y
+            distance = math.sqrt(dx*dx + dy*dy)    # 像素位移
+            # 计算时间差
+            time_diff = current_time - self.prev_time  # 秒
+            # 计算速度（像素/秒）
+            if time_diff > 0:  # 避免除以零
+                self.current_speed = distance / time_diff
+        # 更新上一帧数据
+        self.prev_position = (x + w/2, y + h/2)  # 保存中心点位置
+        self.prev_time = current_time
+        # 在绘制边界框后添加速度显示
+        if self.show_speed:
+            speed_text = f"速度: {self.current_speed:.1f} px/s"
+            cv2.putText(frame, speed_text, (x, y - 30), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+            
         if not self.cap or not self.is_tracking:
             self.timer.stop()
             self.cap.release()
